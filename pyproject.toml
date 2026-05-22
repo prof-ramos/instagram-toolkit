@@ -6,4 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "instagrapi>=2.7.10",
+    "requests>=2.31.0",
+    "phonenumbers>=8.13.0",
+    "pycountry>=22.3.5",
 ]

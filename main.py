@@ -18,6 +18,8 @@ from concurrent.futures import ThreadPoolExecutor
 from instagrapi import Client
 from instagrapi.exceptions import ChallengeRequired, ClientError, ClientLoginRequired
 
+from toutatis_integration import osint_profile, print_osint_report, extract_session_id
+
 # =============================================================================
 # DEFINIÇÃO DE TIPOS
 # =============================================================================
@@ -530,6 +532,10 @@ class InstagramToolkitCLI:
                     self.show_recent_posts(target)
             elif choice == "16":
                 self.show_mutuals()
+            elif choice == "17":
+                target = input("Username (@) ou ID: ").strip()
+                if target:
+                    self.run_osint(target)
             else:
                 print("❌ Opção inválida.")
 
@@ -554,6 +560,7 @@ class InstagramToolkitCLI:
         print("14. 📤 Exportar quem eu sigo (JSON)")
         print("15. 📝 Exibir posts recentes de um usuário")
         print("16. 👥 Exibir seguidores mútuos")
+        print("17. 🕵️  OSINT completo via Toutatis (email/telefone/dados ocultos)")
         print("═" * 60)
 
     def list_followers(self, limit: int) -> None:
@@ -840,6 +847,20 @@ class InstagramToolkitCLI:
                 print("❌ Nenhum seguidor mútuo encontrado.")
         except Exception as e:
             print(f"❌ Erro ao calcular mútuos: {e}")
+
+    def run_osint(self, identifier: str) -> None:
+        """OSINT completo via toutatis: email, telefone, dados ocultos."""
+        print("\n🕵️  Coletando dados OSINT via Toutatis...")
+        try:
+            session_id = extract_session_id(self.service.cl) if hasattr(self.service, 'cl') else None
+            data = osint_profile(
+                username=identifier.lstrip("@"),
+                session_id=session_id,
+            )
+            print()
+            print_osint_report(data)
+        except Exception as e:
+            print(f"❌ Erro no OSINT: {e}")
 
 
 # =============================================================================
