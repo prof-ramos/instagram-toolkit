@@ -1,0 +1,9 @@
+[project]
+name = "instagram-toolkit"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "instagrapi>=2.7.10",
+]

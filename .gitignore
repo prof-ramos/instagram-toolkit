@@ -1,0 +1,24 @@
+# Ambiente virtual do Python / uv
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Cache de ferramentas
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
+# Configurações de ambiente locais (com chaves/senhas)
+.env
+.env.local
+
+# Arquivos de sessão e cookies locais (sensíveis)
+instagrapi.json
+cookies.json
+
+# Dados do Toolkit (Histórico, Backups e Exportações)
+followers_history.json
+history_backups/
+followers_export_*.json
+following_export_*.json
