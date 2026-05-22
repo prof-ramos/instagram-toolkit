@@ -8,6 +8,7 @@ import json
 import random
 import time
 import argparse
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -40,6 +41,16 @@ class GrowthStats(TypedDict):
     end_date: str
 
 
+@dataclass
+class TrackerResult:
+    is_first_run: bool
+    backup_path: Path
+    unfollowed: set[str]
+    new_followers: set[str]
+    history: dict[str, str]
+    current_data: dict[str, str]
+
+
 # =============================================================================
 # EXCEÇÕES PERSONALIZADAS
 # =============================================================================
@@ -48,25 +59,17 @@ class GrowthStats(TypedDict):
 class InstagramToolkitError(Exception):
     """Exceção base para o toolkit do Instagram."""
 
-    pass
-
 
 class AuthenticationError(InstagramToolkitError):
     """Exceção para falhas de autenticação."""
-
-    pass
 
 
 class RateLimitError(InstagramToolkitError):
     """Exceção para limites de requisição excedidos."""
 
-    pass
-
 
 class UserNotFoundError(InstagramToolkitError):
     """Exceção quando um usuário não é encontrado."""
-
-    pass
 
 
 # =============================================================================
@@ -168,8 +171,12 @@ class InstagramService:
             temp_path.touch(exist_ok=True)
             try:
                 temp_path.chmod(0o600)
-            except OSError:
-                pass
+            except OSError as e:
+                logging.warning(
+                    "Não foi possível aplicar permissões seguras ao arquivo %s: %s",
+                    temp_path,
+                    e,
+                )
 
             with temp_path.open("w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
@@ -213,21 +220,23 @@ class InstagramService:
     def get_user_info(self, user_id: int) -> Any:
         return self.cl.user_info(user_id)
 
-    def get_relations_parallel(self) -> tuple[dict[int, Any], dict[int, Any]]:
+    def get_relations_parallel(
+        self, amount: int = 0
+    ) -> tuple[dict[int, Any], dict[int, Any]]:
         user_id = self.cl.user_id
         with ThreadPoolExecutor(max_workers=2) as executor:
             following_future = executor.submit(
-                self.cl.user_following, user_id, amount=0
+                self.cl.user_following, user_id, amount=amount
             )
             followers_future = executor.submit(
-                self.cl.user_followers, user_id, amount=0
+                self.cl.user_followers, user_id, amount=amount
             )
             following = following_future.result()
             followers = followers_future.result()
         return followers, following
 
     def get_non_followers_back(self) -> list[str]:
-        followers, following = self.get_relations_parallel()
+        followers, following = self.get_relations_parallel(amount=0)
         following_set = {u.username for u in following.values()}
         followers_set = {u.username for u in followers.values()}
         return sorted(following_set - followers_set)
@@ -271,6 +280,7 @@ class InstagramService:
     def get_all_followers_safe(
         self, user_id: int, max_retries: int = 3
     ) -> dict[int, Any]:
+        last_exc: Exception | None = None
         for attempt in range(1, max_retries + 1):
             try:
                 print(f"📥 Carregando seguidores... (tentativa {attempt})")
@@ -278,6 +288,7 @@ class InstagramService:
                 print(f"✅ {len(followers)} seguidores carregados.")
                 return followers
             except ClientError as e:
+                last_exc = e
                 if "rate" in str(e).lower():
                     wait = 45 * attempt
                     print(f"⏳ Rate limit. Aguardando {wait}s...")
@@ -285,15 +296,16 @@ class InstagramService:
                 else:
                     raise
             except Exception as e:
+                last_exc = e
                 if attempt == max_retries:
                     raise
                 print(f"⚠️ Erro: {e}. Tentando novamente...")
                 time.sleep(8)
-        return {}
+        raise RuntimeError(
+            f"Falha ao carregar seguidores após {max_retries} tentativas."
+        ) from last_exc
 
-    def run_tracker(
-        self,
-    ) -> tuple[set[str], set[str], dict[str, str], dict[str, str], Path] | Path:
+    def run_tracker(self) -> TrackerResult:
         current = self.get_all_followers_safe(self.cl.user_id)
         current_data = {str(pk): u.username for pk, u in current.items()}
         history = self.load_history()
@@ -302,7 +314,14 @@ class InstagramService:
             backup = self.save_history(current_data)
             if backup is None:
                 raise RuntimeError("Falha ao salvar histórico inicial.")
-            return backup
+            return TrackerResult(
+                is_first_run=True,
+                backup_path=backup,
+                unfollowed=set(),
+                new_followers=set(),
+                history={},
+                current_data={},
+            )
 
         old = set(history.keys())
         new = set(current_data.keys())
@@ -312,14 +331,21 @@ class InstagramService:
         backup = self.save_history(current_data)
         if backup is None:
             raise RuntimeError("Falha ao salvar histórico atualizado.")
-        return unfollowed, new_followers, history, current_data, backup
+        return TrackerResult(
+            is_first_run=False,
+            backup_path=backup,
+            unfollowed=unfollowed,
+            new_followers=new_followers,
+            history=history,
+            current_data=current_data,
+        )
 
     # =========================================================================
     # NOVAS FUNCIONALIDADES v2.2+
     # =========================================================================
 
     def get_auto_follow_back_candidates(self) -> list[str]:
-        followers, following = self.get_relations_parallel()
+        followers, following = self.get_relations_parallel(amount=0)
         followers_set = {u.username for u in followers.values()}
         following_set = {u.username for u in following.values()}
         return sorted(list(followers_set - following_set))
@@ -342,7 +368,7 @@ class InstagramService:
         return len(success), success, failure
 
     def get_mass_unfollow_candidates(self) -> list[str]:
-        followers, following = self.get_relations_parallel()
+        followers, following = self.get_relations_parallel(amount=0)
         followers_set = {u.username for u in followers.values()}
         following_set = {u.username for u in following.values()}
         return sorted(list(following_set - followers_set))
@@ -425,7 +451,7 @@ class InstagramService:
         return self.cl.user_medias(user_id, amount=count)
 
     def get_mutuals(self) -> list[str]:
-        followers, following = self.get_relations_parallel()
+        followers, following = self.get_relations_parallel(amount=0)
         following_set = {u.username for u in following.values()}
         follower_set = {u.username for u in followers.values()}
         return sorted(list(following_set & follower_set))
@@ -627,31 +653,30 @@ class InstagramToolkitCLI:
         )
         try:
             res = self.service.run_tracker()
-            if isinstance(res, Path):
+            if res.is_first_run:
                 print("🆕 Primeira execução! Histórico de seguidores salvo.")
-                print(f"📁 Backup: {res}")
+                print(f"📁 Backup: {res.backup_path}")
                 return
 
-            unfollowed, new_followers, history, current_data, backup = res
             print("\n" + "=" * 58)
             print("📊 RESULTADO DO RASTREAMENTO")
             print("=" * 58)
 
-            if unfollowed:
-                print(f"\n❌ {len(unfollowed)} pessoas pararam de te seguir:")
-                for uid in sorted(unfollowed):
-                    print(f"   • @{history.get(uid, '?')} (ID: {uid})")
+            if res.unfollowed:
+                print(f"\n❌ {len(res.unfollowed)} pessoas pararam de te seguir:")
+                for uid in sorted(res.unfollowed):
+                    print(f"   • @{res.history.get(uid, '?')} (ID: {uid})")
             else:
                 print("\n✅ Ninguém parou de te seguir.")
 
-            if new_followers:
-                print(f"\n✨ {len(new_followers)} novos seguidores:")
-                for uid in sorted(new_followers):
-                    print(f"   • @{current_data[uid]} (ID: {uid})")
+            if res.new_followers:
+                print(f"\n✨ {len(res.new_followers)} novos seguidores:")
+                for uid in sorted(res.new_followers):
+                    print(f"   • @{res.current_data[uid]} (ID: {uid})")
             else:
                 print("\nℹ️  Nenhum novo seguidor.")
 
-            print(f"\n💾 Histórico atualizado + backup: {backup}")
+            print(f"\n💾 Histórico atualizado + backup: {res.backup_path}")
             print("=" * 58)
         except Exception as e:
             print(f"❌ Erro no rastreamento: {e}")

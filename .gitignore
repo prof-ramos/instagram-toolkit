@@ -8,6 +8,8 @@ __pycache__/
 .ruff_cache/
 .mypy_cache/
 .pytest_cache/
+.antigravitycli/
+
 
 # Configurações de ambiente locais (com chaves/senhas)
 .env

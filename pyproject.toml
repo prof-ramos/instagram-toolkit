@@ -1,7 +1,7 @@
 [project]
 name = "instagram-toolkit"
 version = "0.1.0"
-description = "Add your description here"
+description = "Instagram Toolkit v2.2 - Ferramenta completa para automação e análise do Instagram"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
