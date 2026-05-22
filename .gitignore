@@ -24,3 +24,8 @@ followers_history.json
 history_backups/
 followers_export_*.json
 following_export_*.json
+
+# Docusaurus
+website/build/
+website/node_modules/
+website/.docusaurus/
