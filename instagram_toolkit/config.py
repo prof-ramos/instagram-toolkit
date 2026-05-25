@@ -6,20 +6,11 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-# =============================================================================
-# CONSTANTES
-# =============================================================================
-
 MAX_SNAPSHOTS: int = 10
 FETCH_LIMIT: int = 500
 DEFAULT_TTL: float = 300.0
 DEFAULT_DELAY_MIN: float = 1.8
 DEFAULT_DELAY_MAX: float = 3.8
-
-
-# =============================================================================
-# CONFIGURAÇÃO
-# =============================================================================
 
 
 @dataclass
@@ -31,11 +22,6 @@ class Config:
     cookies_file: Path = field(default_factory=lambda: Path("cookies.json"))
     history_file: Path = field(default_factory=lambda: Path("followers_history.json"))
     backup_dir: Path = field(default_factory=lambda: Path("history_backups"))
-
-
-# =============================================================================
-# EXCEÇÕES
-# =============================================================================
 
 
 class InstagramToolkitError(Exception):

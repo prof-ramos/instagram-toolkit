@@ -16,10 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class HistoryStorage:
-    """
-    Responsabilidade única: ler, gravar e gerenciar backups
-    do histórico de seguidores em disco.
-    """
+    """Lê, grava e gerencia backups do histórico de seguidores em disco."""
 
     def __init__(self, config: Config) -> None:
         self.config = config

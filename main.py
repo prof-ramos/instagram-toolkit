@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Instagram Toolkit v3.0 - Ponto de entrada.
-Responsabilidade única: parse de argumentos + wiring de dependências.
+Parse de argumentos e wiring de dependências.
 """
 
 import argparse
@@ -37,14 +37,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def wire_dependencies(config: Config, cache: RelationsCache) -> tuple:
+def wire_dependencies(config: Config, cache: RelationsCache) -> tuple[Client, AuthService, MenuHandlers, InteractiveMenu, TrackerService]:
     """Instancia e conecta todas as dependências da aplicação."""
     client = Client()
     storage = HistoryStorage(config)
     auth = AuthService(config, storage)
     rate_limiter = RateLimiter()
     relations = RelationsService(client, cache, storage)
-    tracker = TrackerService(client, storage)
+    tracker = TrackerService(client, storage, rate_limiter)
     actions = ActionsService(client, cache, relations, rate_limiter)
     handlers = MenuHandlers(relations, actions, tracker, storage, cache)
     menu = InteractiveMenu(handlers, cache)
@@ -80,8 +80,8 @@ def main() -> None:
         print(f"\n👋 Logado como: @{client.username} (ID: {client.user_id})")
 
         if args.watch:
-            from instagram_toolkit.cli.handlers import _watch_loop
-            _watch_loop(handlers.run_tracker, args.watch)
+            from instagram_toolkit.cli.watch import run_watch_loop
+            run_watch_loop(handlers.run_tracker, args.watch)
         elif args.track:
             handlers.run_tracker()
         else:
