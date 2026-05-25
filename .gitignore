@@ -29,3 +29,6 @@ following_export_*.json
 website/build/
 website/node_modules/
 website/.docusaurus/
+
+# OMC / Claude
+.omc/
