@@ -7,8 +7,6 @@ import logging
 import random
 import time
 
-from .config import RateLimitError
-
 logger = logging.getLogger(__name__)
 
 
@@ -43,11 +41,10 @@ class RateLimiter:
     def backoff(self, attempt: int) -> float:
         """
         Aplica espera exponencial com jitter opcional.
-        Levanta RateLimitError caso o tempo de espera atinja o máximo permitido.
+        O tempo é limitado a max_backoff; nunca levanta exceção.
         """
-        wait = min(self.backoff_base * (self.backoff_multiplier ** (attempt - 1)), self.max_backoff)
-        if wait >= self.max_backoff:
-            raise RateLimitError("Rate limit backoff exceeded maximum configured wait")
+        raw_wait = self.backoff_base * (self.backoff_multiplier ** (attempt - 1))
+        wait = min(raw_wait, self.max_backoff)
         if self.jitter:
             wait = random.uniform(wait * 0.8, wait * 1.2)
         logger.warning("⏳ Rate limit detectado. Backoff: %.1fs (tentativa %d)", wait, attempt)

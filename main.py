@@ -91,8 +91,9 @@ def main() -> None:
         print(f"\n❌ Falha na Autenticação: {exc}")
     except KeyboardInterrupt:
         print("\n👋 Encerrado pelo usuário.")
-    except Exception as e:
-        print(f"\n💥 ERRO FATAL: {e}")
+    except Exception:
+        logging.getLogger(__name__).exception("Erro fatal não tratado")
+        print("\n💥 ERRO FATAL: verifique os logs para detalhes.")
 
 
 if __name__ == "__main__":

@@ -40,12 +40,17 @@ class UserRecord:
         )
 
 
-class FollowerData(TypedDict):
+class FollowerData(TypedDict, total=False):
     id: str
     username: str
     full_name: str
     is_private: bool
     is_verified: bool
+    follower_count: int
+    following_count: int
+    media_count: int
+    biography: str
+    external_url: str | None
 
 
 class GrowthStats(TypedDict):

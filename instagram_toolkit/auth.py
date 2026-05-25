@@ -51,6 +51,8 @@ class AuthService:
                 "Nenhuma forma de autenticação disponível. "
                 "Configure INSTAGRAM_SESSION_ID, cookies.json ou usuário/senha no .env."
             )
+        except AuthenticationError:
+            raise
         except Exception as e:
             logger.warning("Falha na autenticação: %s", e)
             raise AuthenticationError(f"Falha na autenticação: {e}") from e
@@ -124,9 +126,8 @@ class AuthService:
             )
         except ClientLoginRequired:
             raise AuthenticationError("Credenciais inválidas.")
-        except (OSError,) as e:
+        except OSError as e:
             logger.warning("Erro de I/O no login: %s", e)
             return False
         except Exception as e:
-            logger.warning("Erro inesperado no login: %s", e)
-            return False
+            raise AuthenticationError(f"Erro no login: {e}") from e

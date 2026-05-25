@@ -20,14 +20,14 @@ logger = logging.getLogger(__name__)
 
 
 def cli_safe(func: Callable[..., Any]) -> Callable[..., Any]:
-    """Decorator that catches Exception, prints a friendly message, and re-raises."""
+    """Decorator that catches Exception, logs a warning, and re-raises."""
 
     @functools.wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         try:
             return func(*args, **kwargs)
-        except Exception as e:
-            print(f"❌ Erro: {e}")
+        except Exception:
+            logger.warning("Erro em %s", func.__name__, exc_info=True)
             raise
 
     return wrapper
@@ -226,8 +226,12 @@ class MenuHandlers:
         print(f"\n💾 Backup: {res.backup_path}")
         print("=" * 58)
 
+    @cli_safe
     def watch_mode(self) -> None:
         interval = _ask_int("Intervalo em minutos (padrão 30): ", default=30)
+        if interval <= 0:
+            print("❌ Intervalo deve ser maior que zero.")
+            return
         from .watch import run_watch_loop
 
         run_watch_loop(self.run_tracker, interval)
