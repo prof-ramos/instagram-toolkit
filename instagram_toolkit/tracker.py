@@ -4,12 +4,13 @@ Serviço de rastreamento de seguidores ao longo do tempo.
 
 import logging
 import time
-from pathlib import Path
+from typing import Any
 
 from instagrapi import Client
 from instagrapi.exceptions import ClientError
 
 from .models import TrackerResult
+from .rate_limiter import RateLimiter
 from .storage import HistoryStorage
 
 logger = logging.getLogger(__name__)
@@ -17,31 +18,34 @@ logger = logging.getLogger(__name__)
 
 class TrackerService:
     """
-    Responsabilidade única: detectar ganhos e perdas de seguidores
-    comparando snapshots do histórico.
+    Detecta ganhos e perdas de seguidores comparando snapshots do histórico.
     """
 
-    def __init__(self, client: Client, storage: HistoryStorage) -> None:
-        self.cl = client
+    def __init__(
+        self,
+        client: Client,
+        storage: HistoryStorage,
+        rate_limiter: RateLimiter,
+    ) -> None:
+        self._client = client
         self.storage = storage
+        self._rate_limiter = rate_limiter
 
     def get_all_followers_safe(
         self, user_id: int, max_retries: int = 3
-    ) -> dict:
+    ) -> dict[int, Any]:
         """Fetch completo sem limite (para tracker), com retry e backoff."""
         last_exc: Exception | None = None
         for attempt in range(1, max_retries + 1):
             try:
                 logger.info("📥 Carregando todos os seguidores (tentativa %d/%d)...", attempt, max_retries)
-                followers = self.cl.user_followers(user_id, amount=0)
+                followers = self._client.user_followers(user_id, amount=0)
                 logger.info("✅ %d seguidores carregados.", len(followers))
                 return followers
             except ClientError as e:
                 last_exc = e
                 if "rate" in str(e).lower():
-                    wait = 45 * attempt
-                    logger.warning("⏳ Rate limit. Aguardando %ds...", wait)
-                    time.sleep(wait)
+                    self._rate_limiter.backoff(attempt)
                 else:
                     raise
             except Exception as e:
@@ -56,7 +60,7 @@ class TrackerService:
 
     def run(self) -> TrackerResult:
         """Executa um ciclo de rastreamento e retorna o resultado."""
-        current = self.get_all_followers_safe(self.cl.user_id)
+        current = self.get_all_followers_safe(self._client.user_id)
         current_data = {str(pk): u.username for pk, u in current.items()}
         history = self.storage.load()
 

@@ -3,11 +3,11 @@ Serviço de relações: followers, following, mutuals e consultas derivadas.
 """
 
 import logging
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
 from instagrapi import Client
+from instagrapi.exceptions import ClientError
 
 from .cache import RelationsCache
 from .config import FETCH_LIMIT
@@ -19,12 +19,12 @@ logger = logging.getLogger(__name__)
 
 class RelationsService:
     """
-    Responsabilidade única: buscar, comparar e exportar
+    Busca, compara e exporta
     listas de seguidores e seguidos.
     """
 
     def __init__(self, client: Client, cache: RelationsCache, storage: HistoryStorage) -> None:
-        self.cl = client
+        self._client = client
         self.cache = cache
         self.storage = storage
 
@@ -34,7 +34,7 @@ class RelationsService:
             logger.debug("[cache hit] followers (%d entradas)", len(cached))
             return cached
         logger.info("📥 Buscando seguidores (limite: %d)...", limit)
-        data = self.cl.user_followers(self.cl.user_id, amount=limit)
+        data = self._client.user_followers(self._client.user_id, amount=limit)
         if len(data) >= limit:
             logger.warning(
                 "⚠️ Resultado truncado: %d/%d. Aumente FETCH_LIMIT ou use --no-cache.",
@@ -49,7 +49,7 @@ class RelationsService:
             logger.debug("[cache hit] following (%d entradas)", len(cached))
             return cached
         logger.info("📥 Buscando seguidos (limite: %d)...", limit)
-        data = self.cl.user_following(self.cl.user_id, amount=limit)
+        data = self._client.user_following(self._client.user_id, amount=limit)
         if len(data) >= limit:
             logger.warning(
                 "⚠️ Resultado truncado: %d/%d. Aumente FETCH_LIMIT ou use --no-cache.",
@@ -59,7 +59,7 @@ class RelationsService:
         return data
 
     def get_relations_parallel(self) -> tuple[dict[int, Any], dict[int, Any]]:
-        """Busca followers e following em paralelo, priorizando cache."""
+        """Busca followers e following, priorizando cache."""
         cached_followers = self.cache.get("followers")
         cached_following = self.cache.get("following")
 
@@ -67,35 +67,37 @@ class RelationsService:
             logger.debug("[cache hit] relations completas (sem chamada de rede)")
             return cached_followers, cached_following
 
-        user_id = self.cl.user_id
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            futures: dict[str, Any] = {}
-            if cached_followers is None:
-                futures["followers"] = executor.submit(
-                    self.cl.user_followers, user_id, amount=FETCH_LIMIT
-                )
-            if cached_following is None:
-                futures["following"] = executor.submit(
-                    self.cl.user_following, user_id, amount=FETCH_LIMIT
-                )
-            if "followers" in futures:
-                cached_followers = futures["followers"].result()
-                self.cache.set("followers", cached_followers)
-            if "following" in futures:
-                cached_following = futures["following"].result()
-                self.cache.set("following", cached_following)
+        user_id = self._client.user_id
+        if cached_followers is None:
+            cached_followers = self._client.user_followers(user_id, amount=FETCH_LIMIT)
+            self.cache.set("followers", cached_followers)
+        if cached_following is None:
+            cached_following = self._client.user_following(user_id, amount=FETCH_LIMIT)
+            self.cache.set("following", cached_following)
 
-        return cached_followers, cached_following  # type: ignore[return-value]
+        return cached_followers, cached_following
 
     def get_followers(self, target_id: int | None = None, limit: int = 50) -> dict[int, Any]:
+        """Return followers for a user.
+
+        When *target_id* is provided the cache is bypassed and the API is
+        queried directly for that user.  Otherwise the authenticated user's
+        followers are returned, served from cache when available.
+        """
         if target_id is None:
             return self.get_my_followers(limit=limit)
-        return self.cl.user_followers(target_id, amount=limit)
+        return self._client.user_followers(target_id, amount=limit)
 
     def get_following(self, target_id: int | None = None, limit: int = 50) -> dict[int, Any]:
+        """Return following for a user.
+
+        When *target_id* is provided the cache is bypassed and the API is
+        queried directly for that user.  Otherwise the authenticated user's
+        following are returned, served from cache when available.
+        """
         if target_id is None:
             return self.get_my_following(limit=limit)
-        return self.cl.user_following(target_id, amount=limit)
+        return self._client.user_following(target_id, amount=limit)
 
     def get_non_followers_back(self) -> list[str]:
         followers, following = self.get_relations_parallel()
@@ -134,6 +136,11 @@ class RelationsService:
                 "full_name": u.full_name,
                 "is_private": u.is_private,
                 "is_verified": u.is_verified,
+                "follower_count": getattr(u, "follower_count", 0),
+                "following_count": getattr(u, "following_count", 0),
+                "media_count": getattr(u, "media_count", 0),
+                "biography": getattr(u, "biography", ""),
+                "external_url": getattr(u, "external_url", None),
             }
             for pk, u in followers.items()
         ]
@@ -149,18 +156,35 @@ class RelationsService:
                 "full_name": u.full_name,
                 "is_private": u.is_private,
                 "is_verified": u.is_verified,
+                "follower_count": getattr(u, "follower_count", 0),
+                "following_count": getattr(u, "following_count", 0),
+                "media_count": getattr(u, "media_count", 0),
+                "biography": getattr(u, "biography", ""),
+                "external_url": getattr(u, "external_url", None),
             }
             for pk, u in following.items()
         ]
         self.storage.secure_write_json(filename, data)
         return len(data)
 
+    def get_user_info(self, user_id: int) -> UserRecord:
+        """Wrap raw instagrapi user_info into the internal UserRecord model."""
+        raw = self._client.user_info(user_id)
+        return UserRecord.from_instagrapi(raw.pk, raw)
+
+    def get_user_medias(self, user_id: int, count: int) -> list[Any]:
+        """Return up to *count* recent medias for the given user."""
+        return self._client.user_medias(user_id, amount=count)
+
     def resolve_user_id(self, identifier: str | int) -> int | None:
         identifier_str = str(identifier).strip().lstrip("@")
+        if not identifier_str:
+            logger.error("Identificador de usuário vazio.")
+            return None
         if identifier_str.isdigit():
             return int(identifier_str)
         try:
-            return int(self.cl.user_id_from_username(identifier_str))
-        except Exception as e:
+            return int(self._client.user_id_from_username(identifier_str))
+        except (ClientError, OSError) as e:
             logger.error("Não foi possível resolver @%s: %s", identifier_str, e)
             return None

@@ -33,17 +33,18 @@ class RateLimiter:
         self.jitter = jitter
 
     def delay(self, min_sec: float | None = None, max_sec: float | None = None) -> None:
-        """Delay simples entre operações normais."""
+        """Pausa a execução por um intervalo aleatório entre os limites fornecidos."""
         lo = min_sec if min_sec is not None else self.base_delay_min
         hi = max_sec if max_sec is not None else self.base_delay_max
         time.sleep(random.uniform(lo, hi))
 
     def backoff(self, attempt: int) -> float:
         """
-        Calcula e aplica backoff exponencial com jitter opcional.
-        Retorna o tempo efetivamente aguardado.
+        Aplica espera exponencial com jitter opcional.
+        O tempo é limitado a max_backoff; nunca levanta exceção.
         """
-        wait = min(self.backoff_base * (self.backoff_multiplier ** (attempt - 1)), self.max_backoff)
+        raw_wait = self.backoff_base * (self.backoff_multiplier ** (attempt - 1))
+        wait = min(raw_wait, self.max_backoff)
         if self.jitter:
             wait = random.uniform(wait * 0.8, wait * 1.2)
         logger.warning("⏳ Rate limit detectado. Backoff: %.1fs (tentativa %d)", wait, attempt)
@@ -51,9 +52,9 @@ class RateLimiter:
         return wait
 
     def follow_delay(self) -> None:
-        """Delay específico para operações de follow (mais conservador)."""
+        """Aguarda um intervalo aleatório maior antes de executar uma operação de follow."""
         self.delay(2.5, 4.5)
 
     def unfollow_delay(self) -> None:
-        """Delay específico para operações de unfollow (mais conservador)."""
+        """Aguarda um intervalo aleatório maior antes de executar uma operação de unfollow."""
         self.delay(3.0, 5.0)
