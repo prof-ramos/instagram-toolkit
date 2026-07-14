@@ -102,7 +102,7 @@ def test_save_multiple_times_never_exceeds_max_snapshots(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Distinct second timestamps so each save creates a unique backup file."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta, timezone, tzinfo
 
     import instagram_toolkit.storage as storage_mod
 
@@ -110,7 +110,7 @@ def test_save_multiple_times_never_exceeds_max_snapshots(
     base = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
     tick = {"i": 0}
 
-    def fake_now(tz=None):
+    def fake_now(tz: tzinfo | None = None) -> datetime:
         current = base + timedelta(seconds=tick["i"])
         tick["i"] += 1
         if tz is not None:

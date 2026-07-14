@@ -37,13 +37,13 @@ class ActionsService:
 
     def follow(self, user_id: int, *, invalidate: bool = True) -> bool:
         result = self._client.user_follow(user_id)
-        if invalidate:
+        if result and invalidate:
             self.cache.invalidate_relations()
         return result
 
     def unfollow(self, user_id: int, *, invalidate: bool = True) -> bool:
         result = self._client.user_unfollow(user_id)
-        if invalidate:
+        if result and invalidate:
             self.cache.invalidate_relations()
         return result
 
@@ -56,13 +56,14 @@ class ActionsService:
         try:
             for username in candidates:
                 try:
-                    user_id = id_map.get(username)
+                    user_id = id_map.get(username) or self.relations.resolve_user_id(
+                        username
+                    )
                     if user_id is None:
-                        # Evita second-hop HTTP no caminho quente: só id_map
-                        raise UserNotFoundError(
-                            f"ID ausente no mapa para @{username}"
-                        )
-                    self.follow(user_id, invalidate=False)
+                        raise UserNotFoundError(f"Usuário @{username} não encontrado")
+                    if not self.follow(user_id, invalidate=False):
+                        failure.append(f"{username} (ação recusada pela API)")
+                        continue
                     mutated = True
                     success.append(username)
                     logger.info("✅ Seguindo de volta @%s", username)
@@ -85,12 +86,14 @@ class ActionsService:
         try:
             for username in candidates:
                 try:
-                    user_id = id_map.get(username)
+                    user_id = id_map.get(username) or self.relations.resolve_user_id(
+                        username
+                    )
                     if user_id is None:
-                        raise UserNotFoundError(
-                            f"ID ausente no mapa para @{username}"
-                        )
-                    self.unfollow(user_id, invalidate=False)
+                        raise UserNotFoundError(f"Usuário @{username} não encontrado")
+                    if not self.unfollow(user_id, invalidate=False):
+                        failure.append(f"{username} (ação recusada pela API)")
+                        continue
                     mutated = True
                     success.append(username)
                     logger.info("✅ Deixou de seguir @%s", username)
