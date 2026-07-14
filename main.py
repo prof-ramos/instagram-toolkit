@@ -43,8 +43,11 @@ def wire_dependencies(config: Config, cache: RelationsCache) -> tuple[Client, Au
     storage = HistoryStorage(config)
     auth = AuthService(config, storage)
     rate_limiter = RateLimiter()
-    relations = RelationsService(client, cache, storage)
-    tracker = TrackerService(client, storage, rate_limiter)
+    relations = RelationsService(
+        client, cache, storage, fetch_limit=config.fetch_limit
+    )
+    # Tracker compartilha o mesmo cache (reuso de snapshot complete)
+    tracker = TrackerService(client, storage, rate_limiter, cache=cache)
     actions = ActionsService(client, cache, relations, rate_limiter)
     handlers = MenuHandlers(relations, actions, tracker, storage, cache)
     menu = InteractiveMenu(handlers, cache)
@@ -72,6 +75,8 @@ def main() -> None:
         print("⚠️  Modo --no-cache ativo: refetch completo em cada operação.")
     else:
         print(f"📊 Cache ativo com TTL de {cache.ttl}s.")
+    fetch_label = "full" if config.fetch_limit == 0 else str(config.fetch_limit)
+    print(f"📥 FETCH_LIMIT={fetch_label} (env INSTAGRAM_FETCH_LIMIT).")
 
     client, auth, handlers, menu, tracker = wire_dependencies(config, cache)
 
