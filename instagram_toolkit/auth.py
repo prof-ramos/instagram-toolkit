@@ -5,6 +5,7 @@ Emite logging em vez de print() para permitir reutilização fora da CLI.
 
 import json
 import logging
+from urllib.parse import unquote
 
 from instagrapi import Client
 from instagrapi.exceptions import ChallengeRequired, ClientLoginRequired
@@ -64,7 +65,8 @@ class AuthService:
     def _try_session_id(self, client: Client) -> bool:
         logger.info("🔑 Tentando autenticação via Session ID...")
         try:
-            client.login_by_sessionid(self.config.session_id)
+            session_id = unquote(self.config.session_id or "")
+            client.login_by_sessionid(session_id)
             logger.info("✅ Autenticado com Session ID.")
             return True
         except (ClientLoginRequired, ChallengeRequired, OSError) as e:
@@ -74,25 +76,53 @@ class AuthService:
             logger.warning("Falha inesperada no Session ID: %s", e)
             return False
 
+    def _load_cookies_dict(self) -> dict[str, str]:
+        with self.config.cookies_file.open("r", encoding="utf-8") as f:
+            cookies_data = json.load(f)
+        match cookies_data:
+            case list():
+                return {
+                    c["name"]: c["value"]
+                    for c in cookies_data
+                    if isinstance(c, dict) and "name" in c and "value" in c
+                }
+            case dict():
+                return {str(k): str(v) for k, v in cookies_data.items()}
+            case _:
+                return {}
+
     def _try_cookies(self, client: Client) -> bool:
         logger.info("🍪 Carregando cookies de %s...", self.config.cookies_file)
         try:
-            with self.config.cookies_file.open("r", encoding="utf-8") as f:
-                cookies_data = json.load(f)
-            match cookies_data:
-                case list():
-                    formatted = {
-                        c["name"]: c["value"]
-                        for c in cookies_data
-                        if isinstance(c, dict) and "name" in c and "value" in c
-                    }
-                case dict():
-                    formatted = cookies_data
-                case _:
-                    formatted = {}
-            client.set_cookies(formatted)
-            client.get_timeline_feed()
-            logger.info("✅ Autenticado via cookies.")
+            formatted = self._load_cookies_dict()
+            if not formatted:
+                logger.warning("Arquivo de cookies vazio ou formato inválido.")
+                return False
+
+            session_id = formatted.get("sessionid") or formatted.get("session_id")
+            if not session_id:
+                logger.warning(
+                    "Cookie sessionid não encontrado em %s.", self.config.cookies_file
+                )
+                return False
+
+            # Browser exports often percent-encode ':' as %3A
+            session_id = unquote(session_id)
+            # login_by_sessionid already validates via user_info
+            client.login_by_sessionid(session_id)
+
+            # Apply remaining cookies on the private session when available
+            for name, value in formatted.items():
+                if name in ("sessionid", "session_id"):
+                    continue
+                try:
+                    client.private.cookies.set(
+                        name, unquote(str(value)), domain=".instagram.com"
+                    )
+                except Exception:
+                    pass
+
+            logger.info("✅ Autenticado via cookies (user: %s).", client.username)
             return True
         except (ClientLoginRequired, ChallengeRequired, OSError, json.JSONDecodeError) as e:
             logger.warning("Falha nos cookies: %s", e)

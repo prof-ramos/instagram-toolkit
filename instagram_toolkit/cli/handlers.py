@@ -62,19 +62,19 @@ class MenuHandlers:
     def list_followers(self) -> None:
         limit = _ask_int("Quantos mostrar? (Enter = 50): ", default=50)
         print(f"\n👥 Listando seguidores (limite: {limit})...")
-        followers = self.relations.get_followers(limit=limit)
-        for i, (pk, user) in enumerate(list(followers.items())[:limit], 1):
+        page, total = self.relations.list_followers(limit=limit)
+        for i, (pk, user) in enumerate(page.items(), 1):
             print(f"   {i:2d}. @{user.username:<28} (ID: {pk})")
-        print(f"   Total: {len(followers)}")
+        print(f"   Exibindo: {len(page)}  |  Total conhecido: {total}")
 
     @cli_safe
     def list_following(self) -> None:
         limit = _ask_int("Quantos mostrar? (Enter = 50): ", default=50)
         print(f"\n➡️  Listando seguidos (limite: {limit})...")
-        following = self.relations.get_following(limit=limit)
-        for i, (pk, user) in enumerate(list(following.items())[:limit], 1):
+        page, total = self.relations.list_following(limit=limit)
+        for i, (pk, user) in enumerate(page.items(), 1):
             print(f"   {i:2d}. @{user.username:<28} (ID: {pk})")
-        print(f"   Total: {len(following)}")
+        print(f"   Exibindo: {len(page)}  |  Total conhecido: {total}")
 
     @cli_safe
     def show_non_followers_back(self) -> None:
