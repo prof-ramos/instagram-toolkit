@@ -57,7 +57,7 @@ class ActionsService:
                 success.append(username)
                 logger.info("✅ Seguindo de volta @%s", username)
                 self.rate_limiter.follow_delay()
-            except (ClientError, ValueError, OSError) as e:
+            except (ClientError, UserNotFoundError, ValueError, OSError) as e:
                 logger.warning("❌ Falha ao seguir @%s: %s", username, e)
                 failure.append(f"{username} ({e})")
         return len(success), success, failure
@@ -76,7 +76,7 @@ class ActionsService:
                 success.append(username)
                 logger.info("✅ Deixou de seguir @%s", username)
                 self.rate_limiter.unfollow_delay()
-            except (ClientError, ValueError, OSError) as e:
+            except (ClientError, UserNotFoundError, ValueError, OSError) as e:
                 logger.warning("❌ Falha ao deixar de seguir @%s: %s", username, e)
                 failure.append(f"{username} ({e})")
         return len(success), success, failure

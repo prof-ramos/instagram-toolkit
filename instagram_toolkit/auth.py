@@ -45,7 +45,11 @@ class AuthService:
                     return True
 
             if self.config.username and self.config.password:
-                return self._try_credentials(client)
+                if self._try_credentials(client):
+                    return True
+                raise AuthenticationError(
+                    "Falha na autenticação por usuário/senha."
+                )
 
             raise AuthenticationError(
                 "Nenhuma forma de autenticação disponível. "
@@ -127,7 +131,6 @@ class AuthService:
         except ClientLoginRequired:
             raise AuthenticationError("Credenciais inválidas.")
         except OSError as e:
-            logger.warning("Erro de I/O no login: %s", e)
-            return False
+            raise AuthenticationError(f"Erro de I/O no login: {e}") from e
         except Exception as e:
             raise AuthenticationError(f"Erro no login: {e}") from e

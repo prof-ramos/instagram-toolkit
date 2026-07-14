@@ -178,6 +178,9 @@ class RelationsService:
 
     def resolve_user_id(self, identifier: str | int) -> int | None:
         identifier_str = str(identifier).strip().lstrip("@")
+        if not identifier_str:
+            logger.error("Identificador de usuário vazio.")
+            return None
         if identifier_str.isdigit():
             return int(identifier_str)
         try:

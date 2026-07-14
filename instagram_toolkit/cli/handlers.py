@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 def cli_safe(func: Callable[..., Any]) -> Callable[..., Any]:
-    """Decorator that catches Exception, logs a warning, and re-raises."""
+    """Catch Exception, log a warning, and keep the interactive menu alive."""
 
     @functools.wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -28,7 +28,8 @@ def cli_safe(func: Callable[..., Any]) -> Callable[..., Any]:
             return func(*args, **kwargs)
         except Exception:
             logger.warning("Erro em %s", func.__name__, exc_info=True)
-            raise
+            print(f"❌ Erro em {func.__name__}. Veja o log para detalhes.")
+            return None
 
     return wrapper
 
@@ -162,9 +163,12 @@ class MenuHandlers:
         print(f"\n📝 Buscando os últimos {count} posts de @{identifier}...")
         medias = self.relations.get_user_medias(user_id, count)
         for i, media in enumerate(medias, 1):
-            date_str = datetime.fromtimestamp(
-                media.taken_at, tz=timezone.utc
-            ).strftime("%Y-%m-%d %H:%M")
+            taken = media.taken_at
+            if isinstance(taken, (int, float)):
+                taken = datetime.fromtimestamp(taken, tz=timezone.utc)
+            elif getattr(taken, "tzinfo", None) is None:
+                taken = taken.replace(tzinfo=timezone.utc)
+            date_str = taken.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M")
             print(f"\n{i}. 📅 {date_str}")
             print(f"   ❤️ {media.like_count:,}   💬 {media.comment_count:,}")
             if media.caption_text:
