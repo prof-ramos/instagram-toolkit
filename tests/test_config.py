@@ -18,6 +18,9 @@ from instagram_toolkit.config import DEFAULT_TTL, Config, resolve_cache_ttl
         ("-10", 0.0),
         ("abc", DEFAULT_TTL),
         ("  ", DEFAULT_TTL),
+        ("inf", DEFAULT_TTL),
+        ("-inf", DEFAULT_TTL),
+        ("nan", DEFAULT_TTL),
     ],
 )
 def test_resolve_cache_ttl_env_policy(
