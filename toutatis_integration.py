@@ -11,7 +11,10 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from instagram_toolkit.rate_limiter import RateLimiter
 from urllib.parse import quote_plus
 
 import phonenumbers
@@ -172,7 +175,7 @@ def osint_profile(
     user_id: int | None = None,
     session_id: str | None = None,
     instagrapi_client: Any | None = None,
-    rate_limiter: Any | None = None,
+    rate_limiter: RateLimiter | None = None,
 ) -> dict[str, Any]:
     """
     Coleta tudo que o toutatis extrai de um perfil Instagram.

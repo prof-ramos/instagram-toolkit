@@ -202,12 +202,7 @@ class MenuHandlers:
             print("Cancelado.")
             return
 
-        from toutatis_integration import extract_session_id, osint_profile, print_osint_report
-
-        session_id = extract_session_id(self.client)
-        if not session_id:
-            print("❌ Não foi possível extrair o session ID da sessão autenticada.")
-            return
+        from toutatis_integration import osint_profile, print_osint_report
 
         username = None if identifier.isdigit() else identifier.lstrip("@")
         user_id = int(identifier) if identifier.isdigit() else None
@@ -216,9 +211,13 @@ class MenuHandlers:
         data = osint_profile(
             username=username,
             user_id=user_id,
-            session_id=session_id,
+            instagrapi_client=self.client,
             rate_limiter=self.rate_limiter,
         )
+        if data.get("error") == "Session ID é obrigatório":
+            print("❌ Não foi possível extrair o session ID da sessão autenticada.")
+            return
+
         print_osint_report(data)
 
     # ------------------------------------------------------------------

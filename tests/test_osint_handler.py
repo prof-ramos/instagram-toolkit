@@ -36,26 +36,26 @@ def test_osint_lookup_calls_rate_limiter_and_prints_report(monkeypatch) -> None:
 
     with (
         patch("instagram_toolkit.cli.handlers._confirm", return_value=True),
-        patch("toutatis_integration.extract_session_id", return_value="sid123"),
         patch("toutatis_integration.osint_profile", return_value={"username": "alice"}) as m_profile,
         patch("toutatis_integration.print_osint_report") as m_report,
     ):
         h.osint_lookup()
 
     m_profile.assert_called_once()
+    assert m_profile.call_args.kwargs["instagrapi_client"] is client
     assert m_profile.call_args.kwargs["rate_limiter"] is rate_limiter
     m_report.assert_called_once_with({"username": "alice"})
 
 
-def test_osint_lookup_missing_session_id_prints_error_and_skips_lookup(monkeypatch) -> None:
+def test_osint_lookup_missing_session_id_prints_error_and_skips_report(monkeypatch) -> None:
     monkeypatch.setattr("builtins.input", lambda _: "alice")
     h = _handlers()
 
     with (
         patch("instagram_toolkit.cli.handlers._confirm", return_value=True),
-        patch("toutatis_integration.extract_session_id", return_value=None),
-        patch("toutatis_integration.osint_profile") as m_profile,
+        patch("toutatis_integration.osint_profile", return_value={"error": "Session ID é obrigatório"}),
+        patch("toutatis_integration.print_osint_report") as m_report,
     ):
         h.osint_lookup()
 
-    m_profile.assert_not_called()
+    m_report.assert_not_called()

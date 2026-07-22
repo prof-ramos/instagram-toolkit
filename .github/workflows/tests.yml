@@ -16,10 +16,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
         with:
-          enable-cache: true
-          python-version-file: '.python-version'
+          python-version: '3.12'
+      - name: Install uv
+        run: pip install uv
       - name: Sync dependencies
         run: uv sync
       - name: Run tests
