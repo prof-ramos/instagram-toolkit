@@ -5,11 +5,15 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 from instagram_toolkit.cli.handlers import MenuHandlers
+from toutatis_integration import ERROR_SESSION_REQUIRED
 
 
-def _handlers(client=None, rate_limiter=None) -> MenuHandlers:
+def _handlers(client=None, rate_limiter=None, relations=None) -> MenuHandlers:
+    if relations is None:
+        relations = MagicMock()
+        relations.resolve_user_id.return_value = 123
     return MenuHandlers(
-        relations=MagicMock(),
+        relations=relations,
         actions=MagicMock(),
         tracker=MagicMock(),
         storage=MagicMock(),
@@ -42,9 +46,25 @@ def test_osint_lookup_calls_rate_limiter_and_prints_report(monkeypatch) -> None:
         h.osint_lookup()
 
     m_profile.assert_called_once()
+    assert m_profile.call_args.kwargs["user_id"] == 123
     assert m_profile.call_args.kwargs["instagrapi_client"] is client
     assert m_profile.call_args.kwargs["rate_limiter"] is rate_limiter
     m_report.assert_called_once_with({"username": "alice"})
+
+
+def test_osint_lookup_unresolvable_identifier_skips_lookup(monkeypatch) -> None:
+    monkeypatch.setattr("builtins.input", lambda _: "alice")
+    relations = MagicMock()
+    relations.resolve_user_id.return_value = None
+    h = _handlers(relations=relations)
+
+    with (
+        patch("instagram_toolkit.cli.handlers._confirm", return_value=True),
+        patch("toutatis_integration.osint_profile") as m_profile,
+    ):
+        h.osint_lookup()
+
+    m_profile.assert_not_called()
 
 
 def test_osint_lookup_missing_session_id_prints_error_and_skips_report(monkeypatch) -> None:
@@ -53,7 +73,7 @@ def test_osint_lookup_missing_session_id_prints_error_and_skips_report(monkeypat
 
     with (
         patch("instagram_toolkit.cli.handlers._confirm", return_value=True),
-        patch("toutatis_integration.osint_profile", return_value={"error": "Session ID é obrigatório"}),
+        patch("toutatis_integration.osint_profile", return_value={"error": ERROR_SESSION_REQUIRED}),
         patch("toutatis_integration.print_osint_report") as m_report,
     ):
         h.osint_lookup()

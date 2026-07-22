@@ -32,6 +32,8 @@ IG_APP_ID_LOOKUP = "124024574287414"
 USER_AGENT_IPHONE = "Instagram 64.0.0.14.96"
 USER_AGENT_LOOKUP = "Instagram 101.0.0.15.120"
 
+ERROR_SESSION_REQUIRED = "Session ID é obrigatório"
+
 
 # ---------------------------------------------------------------------------
 # Funções principais
@@ -62,7 +64,7 @@ def get_user_info_via_api(
     Retorna o mesmo que o endpoint /users/<id>/info/.
     """
     if not session_id:
-        return {"error": "Session ID é obrigatório"}
+        return {"error": ERROR_SESSION_REQUIRED}
 
     # Resolve user_id se só veio username
     if user_id is None and username:
@@ -185,26 +187,26 @@ def osint_profile(
         session_id = extract_session_id(instagrapi_client)
 
     if not session_id:
-        return {"error": "Session ID é obrigatório"}
+        return {"error": ERROR_SESSION_REQUIRED}
+
+    # Resolve username -> user_id uma única vez (evita re-resolver no
+    # caminho de erro e permite aplicar o rate limiter antes da chamada).
+    if user_id is None and username:
+        if rate_limiter is not None:
+            rate_limiter.delay()
+        resolved = _resolve_user_id(username, session_id)
+        if not resolved.get("id"):
+            return {"error": resolved.get("error", "Falha na consulta")}
+        user_id = resolved["id"]
 
     result: dict[str, Any] = {}
 
     # 1. Info básica via API
-    info = get_user_info_via_api(
-        username=username, user_id=user_id, session_id=session_id
-    )
+    if rate_limiter is not None:
+        rate_limiter.delay()
+    info = get_user_info_via_api(user_id=user_id, session_id=session_id)
     if info.get("error"):
-        # Tenta resolver username se não veio
-        if username and not user_id:
-            resolved = _resolve_user_id(username, session_id)
-            if resolved.get("id"):
-                info = get_user_info_via_api(
-                    user_id=resolved["id"], session_id=session_id
-                )
-            else:
-                return {"error": resolved.get("error", "Falha na consulta")}
-        else:
-            return {"error": info["error"]}
+        return {"error": info["error"]}
 
     user = info["user"]
     result["username"] = user.get("username")

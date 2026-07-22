@@ -31,8 +31,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--track", action="store_true", help="Executa rastreamento uma vez e sai")
     parser.add_argument("--no-cache", action="store_true", help="Desabilita cache em memória")
     parser.add_argument(
-        "--cache-ttl", type=int, default=int(DEFAULT_TTL), metavar="SEG",
-        help=f"TTL do cache em segundos (padrão: {int(DEFAULT_TTL)})",
+        "--cache-ttl", type=float, default=None, metavar="SEG",
+        help=(
+            "TTL do cache em segundos "
+            f"(padrão: env INSTAGRAM_CACHE_TTL ou {int(DEFAULT_TTL)})"
+        ),
     )
     return parser
 
@@ -72,7 +75,8 @@ def main() -> None:
     print("╚══════════════════════════════════════════════════════════════╝")
 
     config = Config()
-    cache = RelationsCache(ttl=args.cache_ttl, enabled=not args.no_cache)
+    cache_ttl = args.cache_ttl if args.cache_ttl is not None else config.cache_ttl
+    cache = RelationsCache(ttl=cache_ttl, enabled=not args.no_cache)
 
     if not cache.enabled:
         print("⚠️  Modo --no-cache ativo: refetch completo em cada operação.")
