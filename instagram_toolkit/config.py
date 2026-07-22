@@ -30,6 +30,18 @@ def resolve_fetch_limit() -> int:
     return max(0, value)
 
 
+def resolve_cache_ttl() -> float:
+    """Retorna o TTL do cache em segundos. Valores inválidos viram DEFAULT_TTL."""
+    raw = os.getenv("INSTAGRAM_CACHE_TTL")
+    if raw is None or raw.strip() == "":
+        return DEFAULT_TTL
+    try:
+        value = float(raw)
+    except ValueError:
+        return DEFAULT_TTL
+    return max(0.0, value)
+
+
 # Compat: imports legados `from .config import FETCH_LIMIT`
 FETCH_LIMIT: int = resolve_fetch_limit()
 
@@ -44,9 +56,7 @@ class Config:
     history_file: Path = field(default_factory=lambda: Path("followers_history.json"))
     backup_dir: Path = field(default_factory=lambda: Path("history_backups"))
     fetch_limit: int = field(default_factory=resolve_fetch_limit)
-    cache_ttl: float = field(
-        default_factory=lambda: float(os.getenv("INSTAGRAM_CACHE_TTL", str(DEFAULT_TTL)))
-    )
+    cache_ttl: float = field(default_factory=resolve_cache_ttl)
 
 
 class InstagramToolkitError(Exception):
