@@ -172,6 +172,7 @@ def osint_profile(
     user_id: int | None = None,
     session_id: str | None = None,
     instagrapi_client: Any | None = None,
+    rate_limiter: Any | None = None,
 ) -> dict[str, Any]:
     """
     Coleta tudo que o toutatis extrai de um perfil Instagram.
@@ -234,6 +235,8 @@ def osint_profile(
         )
 
     # 2. Advanced lookup (email/phone ofuscados)
+    if rate_limiter is not None:
+        rate_limiter.delay()
     lookup = advanced_lookup(user.get("username", ""), session_id)
     if lookup.get("error"):
         result["lookup_error"] = lookup["error"]

@@ -49,7 +49,10 @@ def wire_dependencies(config: Config, cache: RelationsCache) -> tuple[Client, Au
     # Tracker compartilha o mesmo cache (reuso de snapshot complete)
     tracker = TrackerService(client, storage, rate_limiter, cache=cache)
     actions = ActionsService(client, cache, relations, rate_limiter)
-    handlers = MenuHandlers(relations, actions, tracker, storage, cache)
+    handlers = MenuHandlers(
+        relations, actions, tracker, storage, cache,
+        client=client, rate_limiter=rate_limiter,
+    )
     menu = InteractiveMenu(handlers, cache)
     return client, auth, handlers, menu, tracker
 

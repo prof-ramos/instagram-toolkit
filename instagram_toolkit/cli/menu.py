@@ -34,13 +34,14 @@ class InteractiveMenu:
             "13": handlers.show_growth_stats,
             "14": handlers.show_recent_posts,
             "15": handlers.show_mutuals,
+            "16": handlers.osint_lookup,
         }
 
     def run(self) -> None:
         while True:
             self._show_menu()
             try:
-                choice = input("\n👉 Escolha uma opção (0-15): ").strip()
+                choice = input("\n👉 Escolha uma opção (0-16): ").strip()
             except (EOFError, KeyboardInterrupt):
                 print("\n👋 Saindo...")
                 break
@@ -77,6 +78,7 @@ class InteractiveMenu:
         print("13. 📈 Estatísticas de crescimento")
         print("14. 📝 Posts recentes de um usuário")
         print("15. 👥 Seguidores mútuos")
+        print("16. 🕵️  OSINT completo (email/telefone ofuscados)")
         print("─" * 60)
         print(" 0. 🚪 Sair")
         print("═" * 60)

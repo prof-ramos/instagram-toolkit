@@ -10,8 +10,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
+    from instagrapi import Client
+
     from ..actions import ActionsService
     from ..cache import RelationsCache
+    from ..rate_limiter import RateLimiter
     from ..relations import RelationsService
     from ..storage import HistoryStorage
     from ..tracker import TrackerService
@@ -47,12 +50,16 @@ class MenuHandlers:
         tracker: "TrackerService",
         storage: "HistoryStorage",
         cache: "RelationsCache",
+        client: "Client",
+        rate_limiter: "RateLimiter",
     ) -> None:
         self.relations = relations
         self.actions = actions
         self.tracker = tracker
         self.storage = storage
         self.cache = cache
+        self.client = client
+        self.rate_limiter = rate_limiter
 
     # ------------------------------------------------------------------
     # LISTAGENS
@@ -176,6 +183,43 @@ class MenuHandlers:
                     "..." if len(media.caption_text) > 90 else ""
                 )
                 print(f"   📝 {caption}")
+
+    # ------------------------------------------------------------------
+    # OSINT
+    # ------------------------------------------------------------------
+
+    @cli_safe
+    def osint_lookup(self) -> None:
+        identifier = input("Username (@) ou ID: ").strip()
+        if not identifier:
+            return
+        print(
+            "\n⚠️  Esta opção consulta dados adicionais (email/telefone "
+            "ofuscados, status de conta) via API interna do Instagram, "
+            "usando sua sessão autenticada."
+        )
+        if not _confirm("Confirmar consulta OSINT"):
+            print("Cancelado.")
+            return
+
+        from toutatis_integration import extract_session_id, osint_profile, print_osint_report
+
+        session_id = extract_session_id(self.client)
+        if not session_id:
+            print("❌ Não foi possível extrair o session ID da sessão autenticada.")
+            return
+
+        username = None if identifier.isdigit() else identifier.lstrip("@")
+        user_id = int(identifier) if identifier.isdigit() else None
+
+        print(f"\n🕵️  Consultando dados de @{identifier}...")
+        data = osint_profile(
+            username=username,
+            user_id=user_id,
+            session_id=session_id,
+            rate_limiter=self.rate_limiter,
+        )
+        print_osint_report(data)
 
     # ------------------------------------------------------------------
     # EXPORTAÇÕES
