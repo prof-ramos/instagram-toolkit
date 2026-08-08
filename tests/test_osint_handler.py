@@ -26,9 +26,13 @@ def _handlers(client=None, rate_limiter=None, relations=None) -> MenuHandlers:
 def test_osint_lookup_cancelled_without_confirmation(monkeypatch) -> None:
     monkeypatch.setattr("builtins.input", lambda _: "alice")
     h = _handlers()
-    with patch("instagram_toolkit.cli.handlers._confirm", return_value=False):
+    with (
+        patch("instagram_toolkit.cli.handlers._confirm", return_value=False),
+        patch("toutatis_integration.osint_profile") as m_profile,
+    ):
         h.osint_lookup()
     # Nenhuma chamada de rede deve ocorrer sem confirmação.
+    m_profile.assert_not_called()
 
 
 def test_osint_lookup_calls_rate_limiter_and_prints_report(monkeypatch) -> None:

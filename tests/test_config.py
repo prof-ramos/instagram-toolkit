@@ -4,7 +4,21 @@ from __future__ import annotations
 
 import pytest
 
-from instagram_toolkit.config import DEFAULT_TTL, Config, resolve_cache_ttl
+from instagram_toolkit.config import DEFAULT_TTL, Config, resolve_cache_ttl, sanitize_ttl
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        (120.0, 120.0),
+        (0.0, 0.0),
+        (-10.0, 0.0),
+        (float("inf"), DEFAULT_TTL),
+        (float("nan"), DEFAULT_TTL),
+    ],
+)
+def test_sanitize_ttl_policy(value: float, expected: float) -> None:
+    assert sanitize_ttl(value) == expected
 
 
 @pytest.mark.parametrize(

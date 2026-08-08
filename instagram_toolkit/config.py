@@ -30,6 +30,13 @@ def resolve_fetch_limit() -> int:
     return max(0, value)
 
 
+def sanitize_ttl(value: float) -> float:
+    """Normaliza um TTL: não-finito vira DEFAULT_TTL; negativo vira 0."""
+    if not math.isfinite(value):
+        return DEFAULT_TTL
+    return max(0.0, value)
+
+
 def resolve_cache_ttl() -> float:
     """Retorna o TTL do cache em segundos. Valores inválidos viram DEFAULT_TTL."""
     raw = os.getenv("INSTAGRAM_CACHE_TTL")
@@ -39,9 +46,7 @@ def resolve_cache_ttl() -> float:
         value = float(raw)
     except ValueError:
         return DEFAULT_TTL
-    if not math.isfinite(value):
-        return DEFAULT_TTL
-    return max(0.0, value)
+    return sanitize_ttl(value)
 
 
 # Compat: imports legados `from .config import FETCH_LIMIT`

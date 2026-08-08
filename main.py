@@ -15,7 +15,12 @@ from instagram_toolkit.auth import AuthService
 from instagram_toolkit.cache import RelationsCache
 from instagram_toolkit.cli.handlers import MenuHandlers
 from instagram_toolkit.cli.menu import InteractiveMenu
-from instagram_toolkit.config import DEFAULT_TTL, AuthenticationError, Config
+from instagram_toolkit.config import (
+    DEFAULT_TTL,
+    AuthenticationError,
+    Config,
+    sanitize_ttl,
+)
 from instagram_toolkit.rate_limiter import RateLimiter
 from instagram_toolkit.relations import RelationsService
 from instagram_toolkit.storage import HistoryStorage
@@ -75,7 +80,7 @@ def main() -> None:
     print("╚══════════════════════════════════════════════════════════════╝")
 
     config = Config()
-    cache_ttl = args.cache_ttl if args.cache_ttl is not None else config.cache_ttl
+    cache_ttl = sanitize_ttl(args.cache_ttl) if args.cache_ttl is not None else config.cache_ttl
     cache = RelationsCache(ttl=cache_ttl, enabled=not args.no_cache)
 
     if not cache.enabled:
