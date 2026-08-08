@@ -32,3 +32,5 @@ website/.docusaurus/
 
 # OMC / Claude
 .omc/
+.omo/
+.maestri/
